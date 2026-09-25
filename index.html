@@ -1,0 +1,1273 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>بازی املای درس ۱: آفریدگار زیبایی</title>
+    <script src="supabase.js" defer></script>
+    <script src="game-db.js" defer></script>
+    <script src="game-audio.js" defer></script>
+    <style>
+        @font-face {
+            font-family: 'Vazirmatn';
+            src: url('Vazirmatn-Regular.woff2') format('woff2');
+            font-weight: normal;
+            font-style: normal;
+        }
+        @font-face {
+            font-family: 'Vazirmatn';
+            src: url('Vazirmatn-Bold.woff2') format('woff2');
+            font-weight: bold;
+            font-style: normal;
+        }
+        :root {
+            --theme-primary: #2e7d32;
+            --theme-dark: #1b5e20;
+            --theme-accent: #388e3c;
+            --theme-bg: #f0fdf4;
+            --theme-card: #ffffff;
+            --theme-border: #86efac;
+            --keyboard-bg: #1e293b;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: 'Vazirmatn', sans-serif; }
+        body {
+            background: linear-gradient(135deg, #e8f5e9, #f0fdf4, #e0f2fe);
+            color: #1f2937;
+            text-align: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+            padding-bottom: 80px;
+            transition: padding-bottom 0.3s;
+        }
+        body.keyboard-open {
+            padding-bottom: 240px;
+        }
+        .hidden { display: none !important; }
+        .screen { width: 100%; display: flex; flex-direction: column; align-items: center; }
+        .container {
+            max-width: 480px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 0 0 22px 22px;
+            padding: 14px;
+            box-shadow: 0 8px 25px rgba(46, 125, 50, 0.12);
+            position: relative;
+            z-index: 10;
+        }
+        .header {
+            background: linear-gradient(135deg, #2e7d32, #388e3c);
+            color: #ffffff;
+            padding: 12px;
+            border-radius: 16px;
+            margin-bottom: 12px;
+            font-weight: bold;
+            box-shadow: 0 4px 12px rgba(46, 125, 50, 0.2);
+            max-height: 95px;
+            opacity: 1;
+            transform: translateY(0);
+            transition: max-height 0.35s ease, opacity 0.25s ease, margin 0.35s ease, transform 0.35s ease, padding 0.35s ease;
+            overflow: hidden;
+        }
+        body.keyboard-open .header {
+            max-height: 0;
+            opacity: 0;
+            margin-bottom: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+            transform: translateY(-25px);
+            pointer-events: none;
+        }
+        h1 { font-size: 1.2rem; margin: 2px 0; }
+        .banner-subtitle { font-size: 0.92rem; font-weight: normal; color: #dcfce7; margin-top: 2px; }
+        .stats-bar {
+            position: sticky;
+            top: 0;
+            width: 100%;
+            background: var(--theme-dark);
+            color: #ffffff;
+            padding: 7px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.88rem;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.15);
+            z-index: 100;
+        }
+        .stat-item { display: flex; align-items: center; gap: 6px; font-weight: bold; }
+        .sound-toggle-btn {
+            background: rgba(255,255,255,0.18);
+            border: 1px solid rgba(255,255,255,0.35);
+            color: white;
+            border-radius: 8px;
+            padding: 3px 8px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-family: inherit;
+        }
+        .seasons-card {
+            position: relative;
+            background: linear-gradient(180deg, #bae6fd 0%, #e0f2fe 35%, #ffffff 100%);
+            border-radius: 16px;
+            padding: 2px;
+            border: 1.5px solid #86efac;
+            box-shadow: 0 3px 10px rgba(46,125,50,0.06);
+            margin-bottom: 12px;
+            overflow: visible;
+        }
+        .seasons-track {
+            position: relative;
+            height: 88px;
+            width: 100%;
+            border-radius: 14px;
+            overflow: visible;
+        }
+        .seasons-svg {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 12px;
+            pointer-events: none;
+        }
+        .trail-line {
+            position: absolute;
+            bottom: 10px;
+            left: 5%;
+            width: 90%;
+            height: 2px;
+            border-top: 1.5px dashed #64748b;
+            z-index: 2;
+            opacity: 0.55;
+        }
+        .station-node {
+            position: absolute;
+            bottom: 0px;
+            width: 22px;
+            height: 22px;
+            background: #ffffff;
+            border: 1.5px solid #94a3b8;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 5;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+            transition: all 0.25s ease;
+        }
+        .st-0 { right: 4%; }
+        .st-1 { right: 29.2%; }
+        .st-2 { right: 49%; }
+        .st-3 { right: 94%; transform: translateX(50%); }
+        .station-node svg { width: 12px; height: 12px; }
+        .station-node.active-station {
+            border-color: #2e7d32;
+            background: #2e7d32;
+            box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.28);
+            transform: scale(1.15);
+        }
+        .st-3.active-station { transform: translateX(50%) scale(1.15); }
+        .station-node.active-station svg { stroke: #ffffff; }
+        .sun-runner {
+            position: absolute;
+            top: 4px;
+            right: 4%;
+            transform: translateX(50%);
+            width: 40px;
+            height: 40px;
+            z-index: 10;
+            transition: right 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+            filter: drop-shadow(0 2px 6px rgba(245, 158, 11, 0.6));
+            pointer-events: none;
+        }
+        .sun-runner svg {
+            width: 100%;
+            height: 100%;
+            animation: sunPulse 2.2s infinite ease-in-out;
+        }
+        .sun-rays {
+            transform-origin: center;
+            animation: sunRotate 12s infinite linear;
+        }
+        @keyframes sunRotate {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @keyframes sunPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+        .section {
+            margin: 6px 0;
+            padding: 14px 10px;
+            background: var(--theme-card);
+            border-radius: 16px;
+            border: 1.5px solid #dcfce7;
+            position: relative;
+        }
+        .meaning {
+            font-size: 0.88rem;
+            color: #0369a1;
+            margin: 6px 0;
+            background: #e0f2fe;
+            padding: 4px 12px;
+            border-radius: 8px;
+            display: inline-block;
+            font-weight: bold;
+        }
+        .question {
+            font-size: 1.95rem;
+            font-weight: 900;
+            margin: 8px 0;
+            letter-spacing: 1px;
+            animation: floatText 3s infinite ease-in-out;
+        }
+        .color-1 { color: #15803d; }
+        .color-2 { color: #0369a1; }
+        .color-3 { color: #b45309; }
+        .color-4 { color: #7c2d12; }
+        .color-5 { color: #047857; }
+        @keyframes floatText {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-3px); }
+        }
+        .audio-repeat-btn {
+            background: #d97706;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 8px 18px;
+            font-size: 0.95rem;
+            cursor: pointer;
+            box-shadow: 0 3px 0 #b45309;
+            font-weight: bold;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin: 6px 0;
+        }
+        .audio-repeat-btn:active { transform: translateY(2px); box-shadow: none; }
+        input[type="text"] {
+            width: 100%;
+            max-width: 280px;
+            padding: 10px;
+            margin: 8px auto;
+            border: 2px solid #86efac;
+            border-radius: 12px;
+            font-size: 1.25rem;
+            text-align: center;
+            direction: rtl;
+            background: #f0fdf4;
+            color: #1f2937;
+            outline: none;
+            display: block;
+        }
+        button.action-btn {
+            background: var(--theme-primary);
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            margin: 6px 4px;
+            border-radius: 12px;
+            font-size: 0.95rem;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 3px 0 var(--theme-dark);
+            transition: 0.15s;
+        }
+        button.action-btn:active { transform: translateY(2px); box-shadow: none; }
+        button.action-btn:disabled { background: #cbd5e1; box-shadow: none; cursor: not-allowed; }
+        .result {
+            margin: 8px 0;
+            font-size: 1.05rem;
+            font-weight: bold;
+            min-height: 34px;
+            padding: 6px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .result.correct { background: #dcfce7; color: #15803d; border: 1.5px solid #22c55e; }
+        .result.wrong { background: #fee2e2; color: #b91c1c; border: 1.5px solid #ef4444; animation: shake 0.4s; }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-4px); }
+            75% { transform: translateX(4px); }
+        }
+        .keyboard-container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: var(--keyboard-bg);
+            padding: 6px 3px 10px;
+            box-shadow: 0 -4px 15px rgba(0,0,0,0.3);
+            z-index: 900;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s cubic-bezier(0, 0, 0.2, 1);
+            transform: translateY(100%);
+            touch-action: none !important;
+            user-select: none !important;
+            -webkit-user-select: none !important;
+        }
+        .keyboard-visible { transform: translateY(0); }
+        .keyboard-row { display: flex; justify-content: center; margin-bottom: 3px; width: 100%; }
+        .key {
+            background: #f8fafc;
+            color: #0f172a;
+            border: none;
+            border-bottom: 3px solid #94a3b8;
+            padding: 9px 0;
+            margin: 1.5px;
+            border-radius: 6px;
+            font-size: 1.05rem;
+            cursor: pointer;
+            flex-grow: 1;
+            max-width: 9%;
+            font-weight: bold;
+            touch-action: none !important;
+            user-select: none !important;
+            -webkit-user-select: none !important;
+        }
+        .key:active { transform: translateY(2px); border-bottom-width: 1px; }
+        .key-space { max-width: 32%; background: #e2e8f0; }
+        .key-half-space { max-width: 18%; background: #e0f2fe; color: #0369a1; font-size: 0.85rem; }
+        .key-back { max-width: 14%; background: #fee2e2; border-bottom-color: #ef4444; color: #b91c1c; }
+        .key-enter { max-width: 16%; background: #dcfce7; border-bottom-color: #22c55e; color: #15803d; }
+        .key-close { background: #cbd5e1; max-width: 100%; border-bottom-color: #64748b; height: 32px; font-size: 0.85rem; }
+        .keyboard-correct .key { background: #dcfce7 !important; border-color: #22c55e !important; }
+        .keyboard-wrong .key { background: #fee2e2 !important; border-color: #ef4444 !important; }
+        .flower {
+            position: fixed;
+            top: -10vh;
+            font-size: 2rem;
+            pointer-events: none;
+            animation: rainDown 3s linear forwards;
+            z-index: 9999;
+        }
+        @keyframes rainDown {
+            0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
+        }
+        .report-card {
+            background: #fff;
+            padding: 16px;
+            border-radius: 14px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            max-width: 440px;
+            width: 94%;
+            text-align: right;
+            margin: 20px auto;
+        }
+        .report-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px dotted #e2e8f0;
+            font-size: 0.92rem;
+        }
+        .report-item span:first-child { font-weight: bold; color: #475569; }
+    </style>
+</head>
+<body>
+
+<div id="feedbackMessage" style="position:fixed; top:0; left:0; width:100%; padding:12px; text-align:center; color:white; font-size:1.2rem; font-weight:bold; z-index:2000; transform:translateY(-100%); transition:0.3s; box-shadow:0 4px 10px rgba(0,0,0,0.25);"></div>
+
+<div id="Screen-Loading" style="display:none; background:linear-gradient(135deg,#e8f5e9,#e0f2fe); position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px;">
+    <div style="font-size: 3.2rem; margin-bottom: 12px;">🎨</div>
+    <h1 style="color:#1b5e20; font-size:1.3rem; margin-bottom:20px; font-weight: bold;">املای درس ۱: آفریدگار زیبایی</h1>
+    <div style="background:#e2e8f0; border-radius:12px; height:16px; width:80%; max-width:360px; overflow:hidden; margin-bottom:15px; border:2px solid #2e7d32;">
+        <div id="portal-loading-bar" style="background: linear-gradient(90deg, #22c55e, #16a34a, #0284c7); width:0%; height:100%; transition:width 0.3s ease;"></div>
+    </div>
+    <p id="portal-loading-text" style="font-size:1rem; color:#1b5e20; font-weight:bold;"></p>
+</div>
+
+<div id="statsBar" class="stats-bar hidden">
+    <div class="stat-item">👤 <span id="studentNameStat">-</span></div>
+    <div style="display:flex; gap:10px; align-items:center;">
+        <button class="sound-toggle-btn" id="btn-sound-toggle" onclick="toggleAppSound()">🔊 صدا: روشن</button>
+        <div class="stat-item">🎮 <span id="gameCountStat">۰</span></div>
+        <div class="stat-item" style="color:#fde047;">⭐ <span id="starCountStat">۰</span></div>
+    </div>
+</div>
+
+<div class="container">
+    <div class="header" id="schoolHeader">
+        <h1 id="portal-school-title">---</h1>
+        <div class="banner-subtitle" id="game-lesson-title">املای درس اول</div>
+    </div>
+
+    <div id="screenRegister" class="screen">
+        <div id="portal-welcome-section" style="width:100%;">
+            <h2 style="color:#1b5e20; margin-bottom:6px; font-size:1.15rem;">سلام قهرمان پرتلاش! 🌸</h2>
+            <p style="color:#2e7d32; font-size:0.88rem; margin-bottom:12px;">بیا با هم املای درس آفریدگار زیبایی رو در ۳ بخش تمرین کنیم و ستاره بگیریم!</p>
+            
+            <div style="display: flex; flex-direction: column; gap: 8px; background: #f0fdf4; border-radius: 12px; padding: 12px; border: 1px dashed var(--theme-border); margin: 12px auto; text-align: right; direction: rtl; font-size: 0.92rem; width: 100%; max-width: 270px;">
+                <div style="display:flex; justify-content:space-between;">
+                    <span>👤 نامت:</span>
+                    <span id="portal-student-name" style="font-weight:bold; color:var(--theme-dark);">---</span>
+                </div>
+                <div style="display:flex; justify-content:space-between;">
+                    <span>🎮 تلاش‌های قبلی:</span>
+                    <span id="portal-prev-plays" style="font-weight:bold; color:#d97706;">۰</span>
+                </div>
+                <div style="display:flex; justify-content:space-between;">
+                    <span>⭐ ستاره‌های قبلی:</span>
+                    <span id="portal-prev-stars" style="font-weight:bold; color:#f59e0b;">۰ ⭐</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-weight:bold; color:#15803d; border-top:1px dashed var(--theme-border); padding-top:6px;">
+                    <span>🎯 ستاره هدف تکلیف:</span>
+                    <span id="portal-req-stars">۰ ⭐</span>
+                </div>
+            </div>
+        </div>
+
+        <button id="startGame" style="background:#2e7d32; color:white; padding:11px 22px; border:none; border-radius:12px; cursor:pointer; width:100%; max-width:250px; font-weight: bold; font-size: 1rem; box-shadow: 0 3px 0 #1b5e20;">شروع املا 🎨</button>
+
+        <div id="portal-error-section" style="display:none; text-align:center; padding:16px; max-width: 420px; margin: 15px auto; background: white; border-radius: 12px;">
+            <h3 style="color:#d32f2f; margin-bottom:6px; font-size:1rem;">خطا در اتصال به کلاس</h3>
+            <p style="color:#555; font-size:0.88rem; margin-bottom:12px; line-height:1.6;">برای گرفتن تکالیفت، باید به اینترنت وصل باشی. لطفاً اینترنتت رو بررسی کن و دوباره دکمه زیر رو بزن.</p>
+            <button style="background:#0284c7; color: white; padding: 8px 18px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;" onclick="retryAuthentication()">🔄 تلاش دوباره</button>
+        </div>
+    </div>
+
+    <div id="screenGame" class="hidden">
+        <h2 id="welcomeName" style="color:var(--theme-primary); font-size:1rem; margin-bottom:2px;"></h2>
+        <div style="font-weight:bold; font-size:0.88rem; margin-bottom:6px; color:#1f2937;">مرحله: <span id="currentQIndexDisplay">۰</span> از <span id="totalQDisplay">۵۰</span></div>
+        
+        <div class="seasons-card">
+            <div class="seasons-track">
+                <svg class="seasons-svg" viewBox="0 0 600 100" preserveAspectRatio="none">
+                    <defs>
+                        <linearGradient id="springGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#bbf7d0"/><stop offset="100%" stop-color="#4ade80"/></linearGradient>
+                        <linearGradient id="summerGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fef08a"/><stop offset="100%" stop-color="#16a34a"/></linearGradient>
+                        <linearGradient id="autumnGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#fdba74"/><stop offset="100%" stop-color="#c2410c"/></linearGradient>
+                        <linearGradient id="winterGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#e0f2fe"/><stop offset="100%" stop-color="#93c5fd"/></linearGradient>
+                    </defs>
+
+                    <path d="M0,56 Q75,44 150,58 L150,100 L0,100 Z" fill="url(#winterGrad)"/>
+                    <path d="M150,58 Q225,48 300,60 L300,100 L150,100 Z" fill="url(#autumnGrad)"/>
+                    <path d="M300,60 Q375,46 450,54 L450,100 L300,100 Z" fill="url(#summerGrad)"/>
+                    <path d="M450,54 Q525,44 600,52 L600,100 L450,100 Z" fill="url(#springGrad)"/>
+
+                    <path d="M537,56 Q539,72 541,78 L533,78 Q535,72 534,56 Z" fill="#854d0e"/>
+                    <circle cx="536" cy="45" r="16" fill="#bbf7d0"/>
+                    <circle cx="525" cy="40" r="13" fill="#86efac"/>
+                    <circle cx="547" cy="38" r="13" fill="#bbf7d0"/>
+                    <circle cx="536" cy="32" r="12" fill="#dcfce7"/>
+                    <circle cx="528" cy="33" r="2.2" fill="#f472b6"/>
+                    <circle cx="544" cy="35" r="2.2" fill="#f472b6"/>
+                    <circle cx="534" cy="42" r="2.4" fill="#fb7185"/>
+                    <circle cx="536" cy="36" r="2.3" fill="#fde047"/>
+                    <circle cx="541" cy="47" r="2.1" fill="#facc15"/>
+
+                    <path d="M375,56 Q377,72 379,80 L371,80 Q373,72 373,56 Z" fill="#451a03"/>
+                    <circle cx="375" cy="44" r="17" fill="#15803d"/>
+                    <circle cx="362" cy="40" r="14" fill="#16a34a"/>
+                    <circle cx="388" cy="39" r="14" fill="#15803d"/>
+                    <circle cx="375" cy="31" r="13" fill="#22c55e"/>
+                    <circle cx="365" cy="36" r="2.8" fill="#ef4444"/>
+                    <circle cx="385" cy="34" r="2.7" fill="#dc2626"/>
+                    <circle cx="374" cy="41" r="3" fill="#ef4444"/>
+                    <circle cx="387" cy="45" r="2.7" fill="#ef4444"/>
+
+                    <path d="M228,58 Q230,73 232,80 L224,80 Q226,73 226,58 Z" fill="#451a03"/>
+                    <circle cx="228" cy="46" r="15" fill="#9a3412"/>
+                    <circle cx="216" cy="42" r="12" fill="#ea580c"/>
+                    <circle cx="240" cy="40" r="12" fill="#f59e0b"/>
+                    <circle cx="228" cy="33" r="11" fill="#f97316"/>
+                    <ellipse cx="204" cy="50" rx="3.5" ry="1.8" fill="#ea580c" transform="rotate(35 204 50)"/>
+                    <ellipse cx="248" cy="58" rx="3" ry="1.6" fill="#c2410c" transform="rotate(-25 248 58)"/>
+
+                    <polygon points="118,44 109,56 127,56" fill="#38bdf8"/>
+                    <polygon points="118,52 106,66 130,66" fill="#0284c7"/>
+                    <circle cx="62" cy="73" r="9.5" fill="#ffffff" stroke="#bae6fd" stroke-width="1.2"/>
+                    <circle cx="62" cy="70" r="1" fill="#1e293b"/>
+                    <circle cx="62" cy="75" r="1" fill="#1e293b"/>
+                    <circle cx="62" cy="58" r="6.5" fill="#ffffff" stroke="#bae6fd" stroke-width="1.2"/>
+                    <circle cx="60" cy="56" r="0.9" fill="#0f172a"/>
+                    <circle cx="64" cy="56" r="0.9" fill="#0f172a"/>
+                    <polygon points="62,58 62,60 57,59" fill="#ea580c"/>
+                    <path d="M57,63 Q62,66 67,63 L68,69 L64,65 L58,68 Z" fill="#ef4444"/>
+                    <line x1="53" y1="69" x2="45" y2="65" stroke="#78350f" stroke-width="1.3" stroke-linecap="round"/>
+                    <line x1="71" y1="69" x2="79" y2="65" stroke="#78350f" stroke-width="1.3" stroke-linecap="round"/>
+                </svg>
+
+                <div class="trail-line"></div>
+
+                <div class="station-node st-0" id="node-0" title="بخش اول: واژه‌های ناقص">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2.5"><path d="M12 19l7-7 3 3-7 7-3-3z"/></svg>
+                </div>
+                <div class="station-node st-1" id="node-1" title="بخش دوم: درست‌نویسی">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2.5"><circle cx="12" cy="12" r="7"/></svg>
+                </div>
+                <div class="station-node st-2" id="node-2" title="بخش سوم: املای شنیداری">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/></svg>
+                </div>
+                <div class="station-node st-3" id="node-3" title="پایان">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2.5"><polygon points="12 2 15 8 22 9 17 14 18 21 12 17 6 21 7 14 2 9 9 8 12 2"/></svg>
+                </div>
+
+                <div class="sun-runner" id="sunRunner">
+                    <svg viewBox="0 0 64 64">
+                        <g class="sun-rays" stroke="#f59e0b" stroke-width="3" stroke-linecap="round">
+                            <line x1="32" y1="4" x2="32" y2="10"/><line x1="32" y1="54" x2="32" y2="60"/>
+                            <line x1="4" y1="32" x2="10" y2="32"/><line x1="54" y1="32" x2="60" y2="32"/>
+                            <line x1="12" y1="12" x2="16.5" y2="16.5"/><line x1="47.5" y1="47.5" x2="52" y2="52"/>
+                            <line x1="12" y1="52" x2="16.5" y2="47.5"/><line x1="47.5" y1="16.5" x2="52" y2="12"/>
+                        </g>
+                        <circle cx="32" cy="32" r="16" fill="url(#sunFaceGrad)" stroke="#d97706" stroke-width="1.6"/>
+                        <circle cx="26" cy="30" r="2" fill="#78350f"/><circle cx="38" cy="30" r="2" fill="#78350f"/>
+                        <path d="M27,35 Q32,39 37,35" fill="none" stroke="#78350f" stroke-width="1.8" stroke-linecap="round"/>
+                        <defs>
+                            <linearGradient id="sunFaceGrad" x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0%" stop-color="#fef08a"/><stop offset="100%" stop-color="#f59e0b"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div id="questionSection" class="section">
+            <h3 id="sectionTitle" style="font-size:0.95rem; color:var(--theme-primary); margin-bottom:4px;"></h3>
+            
+            <div id="visualQuestionBox">
+                <div id="currentQuestion" class="question"></div>
+            </div>
+
+            <div id="audioQuestionBox" class="hidden">
+                <button class="audio-repeat-btn" onclick="playCurrentWordAudio()">🔊 پخش دوباره واژه</button>
+            </div>
+
+            <div class="meaning hidden" id="meaningText"></div>
+            
+            <input type="text" id="answerInput" placeholder="واژه را اینجا بنویس..." readonly onclick="openKeyboard()">
+            
+            <button class="action-btn" id="checkBtn" onclick="checkAnswer()">بررسی پاسخ ✅</button>
+            <div class="result" id="resultDisplay"></div>
+        </div>
+    </div>
+
+    <div id="screenReport" class="screen hidden" style="padding: 10px;">
+        <div class="report-card">
+            <h2 style="text-align: center; margin-bottom: 16px; color: var(--theme-primary); font-size:1.25rem;">کارنامه‌ی درخشانت 🌟</h2>
+            <div style="text-align: right; background: #fafafa; padding: 12px; border-radius: 10px; border: 1px solid #eee; margin-bottom: 12px;">
+                <div class="report-item"><span>مدرسه:</span><span id="rep-school">---</span></div>
+                <div class="report-item"><span>نام دانش‌آموز:</span><span id="rep-name">---</span></div>
+                <div class="report-item"><span>تاریخ و زمان:</span><span id="rep-time" style="direction: ltr; font-size:0.82rem;">---</span></div>
+                <div class="report-item"><span>تعداد تلاش‌ها:</span><span id="rep-games">۰</span></div>
+                <div class="report-item"><span>ستاره‌های گرفته‌شده:</span><span>⭐ <span id="rep-stars">۰</span></span></div>
+                <div class="report-item" id="portal-req-stars-row" style="display:none; font-weight:bold; color:#15803d; border-top:1px dashed #ccc; padding-top:6px;">
+                    <span>🎯 ستاره مورد نیاز تکلیف:</span>
+                    <span id="rep-req-stars">۰ ⭐</span>
+                </div>
+            </div>
+
+            <div id="portal-submit-badge" style="display:none; background:#fff3e0; border:1px solid #ffe082; color:#d97706; padding:10px; border-radius:10px; margin-bottom:10px; font-weight:bold; font-size:0.92rem; text-align:right;"></div>
+            <div id="portal-goal-reached-badge" style="display:none; background:#dcfce7; border:2px solid #22c55e; color:#15803d; padding:10px; border-radius:10px; margin-bottom:10px; font-weight:bold; font-size:0.92rem; text-align:right;">
+                🎉 آفرین به تو قهرمان پرتلاش! واقعاً گل کاشتی و همه‌ی ستاره‌های تکلیف رو به دست آوردی! کارت فوق‌العاده بود! 🥇 حالا می‌تونی با خیال راحت به پرتال برگردی. ❤️
+            </div>
+            <div id="portal-back-instruction" style="display:none; width: 100%;"></div>
+
+            <button id="playAgainBtn" class="action-btn" style="width: 100%; height: 44px; background: #2e7d32; font-size: 1rem; margin-top: 8px;" onclick="restartGame()">تمرین دوباره 🔄</button>
+        </div>
+    </div>
+
+    <div id="screen-assistant" class="screen hidden" style="padding: 16px;">
+        <div class="report-card">
+            <h2 style="color: var(--theme-dark); margin-bottom: 12px; font-size: 1.25rem; text-align:center;">🌟 دستیار ثبت ستاره 🌟</h2>
+            <div style="background: #fff; border: 2px dashed #0284c7; border-radius: 12px; padding: 12px; margin-bottom: 16px; line-height: 1.7; text-align: justify;">
+                <span style="font-size: 1.05rem; font-weight: bold; color: var(--theme-dark); display: block; margin-bottom: 6px;" id="ast-welcome">سلام قهرمان!</span>
+                <p style="font-size: 0.9rem; color: #333; margin: 0;">
+                    بازی قبلی‌ات با موفقیت تموم شده بود، اما به خاطر قطع شدن اینترنت، ستاره‌ات به دفتر کلاسی معلم نرسیده بود. دکمه زیر رو بزن تا ستاره‌ات ثبت بشه و کارنامه‌ات رو ببینی! 😊
+                </p>
+            </div>
+            <button style="width: 100%; height: 46px; background: #2e7d32; color: white; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; font-size:1rem;" onclick="submitAssistantStar()">🌟 ثبت ستاره و دیدن کارنامه</button>
+        </div>
+    </div>
+
+    <div id="portal-submitting-screen" class="screen hidden" style="background:linear-gradient(135deg,#e8f5e9,#e0f2fe); position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px;">
+        <div style="max-width: 400px; background: white; padding: 18px; border-radius: 14px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); width: 100%; text-align: center;">
+            <h3 style="color:#1b5e20; margin-bottom:12px; font-weight:bold; font-size:1.15rem;">⏳ در حال فرستادن نمره‌ها به دفتر کلاس...</h3>
+            <div style="background:#eee; border-radius:10px; height:16px; width:100%; overflow:hidden; margin-bottom:12px;">
+                <div id="portal-progress-bar" style="background:linear-gradient(90deg, #22c55e, #16a34a, #0284c7); width:0%; height:100%; transition:width 0.2s;"></div>
+            </div>
+            <p id="portal-submit-status-text" style="font-size:0.92rem; color:#555; font-weight:bold; line-height:1.6;"></p>
+            <button id="portal-retry-submit-btn" style="display:none; margin:12px auto 0; background:#e11d48; color: white; padding: 9px 18px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer;" onclick="retrySubmission()">🔄 تلاش دوباره برای فرستادن</button>
+        </div>
+    </div>
+</div>
+
+<div id="virtualKeyboard" class="keyboard-container">
+    <div class="keyboard-row">
+        <button class="key" data-key="چ">چ</button><button class="key" data-key="ج">ج</button><button class="key" data-key="ح">ح</button><button class="key" data-key="خ">خ</button><button class="key" data-key="ه">ه</button><button class="key" data-key="ع">ع</button><button class="key" data-key="غ">غ</button><button class="key" data-key="ف">ف</button><button class="key" data-key="ق">ق</button><button class="key" data-key="ث">ث</button><button class="key" data-key="ص">ص</button><button class="key" data-key="ض">ض</button>
+    </div>
+    <div class="keyboard-row">
+        <button class="key" data-key="گ">گ</button><button class="key" data-key="ک">ک</button><button class="key" data-key="م">م</button><button class="key" data-key="ن">ن</button><button class="key" data-key="ت">ت</button><button class="key" data-key="ا">ا</button><button class="key" data-key="ل">ل</button><button class="key" data-key="ب">ب</button><button class="key" data-key="ی">ی</button><button class="key" data-key="س">س</button><button class="key" data-key="ش">ش</button>
+    </div>
+    <div class="keyboard-row">
+        <button class="key" data-key="ئ">ئ</button><button class="key" data-key="آ">آ</button><button class="key" data-key="و">و</button><button class="key" data-key="پ">پ</button><button class="key" data-key="د">د</button><button class="key" data-key="ذ">ذ</button><button class="key" data-key="ر">ر</button><button class="key" data-key="ز">ز</button><button class="key" data-key="ژ">ژ</button><button class="key" data-key="ط">ط</button><button class="key" data-key="ظ">ظ</button>
+    </div>
+    <div class="keyboard-row">
+        <button class="key key-enter" data-key="enter">بررسی</button>
+        <button class="key key-space" data-key=" ">فاصله</button>
+        <button class="key key-half-space" data-key="‌">نیم‌فاصله</button>
+        <button class="key key-back" data-key="back">⌫</button>
+    </div>
+    <div class="keyboard-row" style="margin-top:2px;">
+        <button class="key key-close" onclick="closeKeyboard()">🔻 بستن کیبورد</button>
+    </div>
+</div>
+
+<script>
+    const LESSON_ID = "01";
+    let STORAGE_KEY = 'studentProfile_Emla01_Default';
+    let GAME_STATE_KEY = 'gameState_Emla01_Default';
+
+    const CELEBRATION_ICONS = ['🌸', '☀️', '🍂', '⛄', '🎨', '✨', '🍎', '🦋'];
+    const STATION_POSITIONS = [4, 29.2, 49, 94];
+    const COLOR_CLASSES = ['color-1', 'color-2', 'color-3', 'color-4', 'color-5'];
+
+    const toPersian = num => String(num).replace(/\d/g, d => '۰۱۲۳۴۵۶۷۸۹'[d]);
+    const getEl = id => document.getElementById(id);
+
+    let isProcessingAnswer = false;
+
+    function ensureLessonBannerText() {
+        const el = getEl('game-lesson-title');
+        if (el && el.textContent !== 'املای درس اول') {
+            el.textContent = 'املای درس اول';
+        }
+    }
+
+    const lessonTitleNode = getEl('game-lesson-title');
+    if (lessonTitleNode) {
+        const titleObserver = new MutationObserver(() => {
+            if (lessonTitleNode.textContent !== 'املای درس اول') {
+                lessonTitleNode.textContent = 'املای درس اول';
+            }
+        });
+        titleObserver.observe(lessonTitleNode, { childList: true, characterData: true, subtree: true });
+    }
+
+    function toggleAppSound() {
+        const isMuted = GameAudio.toggleMute();
+        const btn = getEl('btn-sound-toggle');
+        if (btn) btn.innerText = isMuted ? '🔇 صدا: خاموش' : '🔊 صدا: روشن';
+    }
+
+    function normalizeText(str) {
+        if (!str) return '';
+        return str
+            .replace(/[\u200C\u200E\u200F\u00A0]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .replace(/[ي]/g, 'ی')
+            .replace(/[ك]/g, 'ک')
+            .replace(/[ة]/g, 'ه')
+            .replace(/[ًٌٍَُِّْٰ]/g, '')
+            .trim();
+    }
+
+    function cleanForCompare(str) {
+        return normalizeText(str).replace(/\s+/g, '');
+    }
+
+    const questionData = [
+        {
+            title: "بخش اول: واژه‌های ناقص را کامل کن",
+            introSound: "intro_sec_1",
+            type: "visual",
+            questions: [
+                { q: "بـ...ار", h: "فصل شکوفه‌ها", a: ["بهار"] },
+                { q: "...ـحبت", h: "گفتگو", a: ["صحبت"] },
+                { q: "بـ...ـیّه", h: "دیگران", a: ["بقیّه", "بقیه"] },
+                { q: "تـ...میم", h: "اراده", a: ["تصمیم"] },
+                { q: "پـ...یرفت", h: "قبول کرد", a: ["پذیرفت"] },
+                { q: "شرو...", h: "آغاز", a: ["شروع"] },
+                { q: "...ـلم", h: "ابزار نوشتن", a: ["قلم"] },
+                { q: "ا...ـراف", h: "دور و بر", a: ["اطراف"] },
+                { q: "...ـشرات", h: "جانوران ریز", a: ["حشرات"] },
+                { q: "مـ...ـرفت", h: "شناخت", a: ["معرفت"] },
+                { q: "بر...ـه", h: "آبگیر کوچک", a: ["برکه"] },
+                { q: "تـ...ویر", h: "عکس", a: ["تصویر"] },
+                { q: "منـ...ـره", h: "چشم‌انداز", a: ["منظره"] },
+                { q: "...ـنوبر", h: "درخت راست‌قامت", a: ["صنوبر"] }
+            ]
+        },
+        {
+            title: "بخش دوم: شکل درست واژه را بنویس",
+            introSound: "intro_sec_2",
+            type: "visual",
+            questions: [
+                { q: "سورتی", h: "سرخِ کم‌رنگ", a: ["صورتی"] },
+                { q: "تبیعت", h: "جهان آفرینش", a: ["طبیعت"] },
+                { q: "تلایی", h: "زردِ درخشان", a: ["طلایی"] },
+                { q: "بعزی", h: "برخی", a: ["بعضی"] },
+                { q: "قتره", h: "چکّه آب", a: ["قطره"] },
+                { q: "نزر", h: "دیدگاه", a: ["نظر"] },
+                { q: "ستح", h: "رویه", a: ["سطح"] },
+                { q: "غشر", h: "پوسته", a: ["قشر"] },
+                { q: "مزاره", h: "کشتزارها", a: ["مزارع"] },
+                { q: "چیردست", h: "ماهر", a: ["چیره‌دست", "چیره دست"] },
+                { q: "نغش", h: "طرح", a: ["نقش"] }
+            ]
+        },
+        {
+            title: "بخش سوم: املای شنیداری (به صدا گوش بده و بنویس)",
+            introSound: "intro_sec_3",
+            type: "audio",
+            questions: [
+                { audio: "word_1", h: "فصل شکوفه‌ها", a: ["بهار"] },
+                { audio: "word_2", h: "گفتگو", a: ["صحبت"] },
+                { audio: "word_3", h: "دیگران", a: ["بقیّه", "بقیه"] },
+                { audio: "word_4", h: "اراده", a: ["تصمیم"] },
+                { audio: "word_5", h: "قبول کرد", a: ["پذیرفت"] },
+                { audio: "word_6", h: "آغاز", a: ["شروع"] },
+                { audio: "word_7", h: "ابزار نوشتن", a: ["قلم"] },
+                { audio: "word_8", h: "دور و بر", a: ["اطراف"] },
+                { audio: "word_9", h: "جانوران ریز", a: ["حشرات"] },
+                { audio: "word_10", h: "شناخت", a: ["معرفت"] },
+                { audio: "word_11", h: "آبگیر کوچک", a: ["برکه"] },
+                { audio: "word_12", h: "عکس", a: ["تصویر"] },
+                { audio: "word_13", h: "چشم‌انداز", a: ["منظره"] },
+                { audio: "word_14", h: "درخت راست‌قامت", a: ["صنوبر"] },
+                { audio: "word_15", h: "سرخِ کم‌رنگ", a: ["صورتی"] },
+                { audio: "word_16", h: "جهان آفرینش", a: ["طبیعت"] },
+                { audio: "word_17", h: "زردِ درخشان", a: ["طلایی"] },
+                { audio: "word_18", h: "برخی", a: ["بعضی"] },
+                { audio: "word_19", h: "چکّه آب", a: ["قطره"] },
+                { audio: "word_20", h: "دیدگاه", a: ["نظر"] },
+                { audio: "word_21", h: "رویه", a: ["سطح"] },
+                { audio: "word_22", h: "پوسته", a: ["قشر"] },
+                { audio: "word_23", h: "کشتزارها", a: ["مزارع"] },
+                { audio: "word_24", h: "ماهر", a: ["چیره‌دست", "چیره دست"] },
+                { audio: "word_25", h: "طرح", a: ["نقش"] }
+            ]
+        }
+    ];
+
+    const totalQuestions = questionData[0].questions.length + questionData[1].questions.length + questionData[2].questions.length;
+    let questionsCompleted = 0;
+    let lastPlayedSectionIntro = -1;
+
+    let userProfile = {
+        name: "",
+        totalGames: 0,
+        totalStars: 0,
+        reportShown: false
+    };
+
+    let currentGameState = {
+        score: 0,
+        completedCount: 0
+    };
+
+    function openKeyboard() {
+        GameAudio.playSFX('click');
+        const keyboard = getEl('virtualKeyboard');
+        keyboard.classList.add('keyboard-visible');
+        document.body.classList.add('keyboard-open');
+        setTimeout(() => {
+            getEl('answerInput').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 120);
+    }
+    
+    function closeKeyboard() {
+        getEl('virtualKeyboard').classList.remove('keyboard-visible');
+        document.body.classList.remove('keyboard-open');
+    }
+
+    function animateFeedback(type) {
+        const keyboard = getEl('virtualKeyboard');
+        const colorClass = type === 'correct' ? 'keyboard-correct' : 'keyboard-wrong';
+        const feedbackBar = getEl('feedbackMessage');
+        const bg = type === 'correct' ? '#15803d' : '#b91c1c';
+        const txt = type === 'correct' ? 'آفرین! کاملاً درسته 🎯' : 'دقت کن قهرمان! دوباره بنویس ❌';
+
+        keyboard.classList.add(colorClass);
+        setTimeout(() => { keyboard.classList.remove(colorClass); }, 700);
+
+        feedbackBar.style.background = bg;
+        feedbackBar.innerText = txt;
+        feedbackBar.style.transform = 'translateY(0)';
+        setTimeout(() => { feedbackBar.style.transform = 'translateY(-100%)'; }, 1400);
+    }
+
+    function showCelebrationEffects() {
+        for (let i = 0; i < 16; i++) {
+            const icon = document.createElement('div');
+            icon.classList.add('flower');
+            icon.innerText = CELEBRATION_ICONS[Math.floor(Math.random() * CELEBRATION_ICONS.length)];
+            icon.style.left = `${Math.random() * 90}vw`; 
+            icon.style.animationDuration = `${Math.random() * 1.5 + 1.5}s`;
+            document.body.appendChild(icon);
+            setTimeout(() => { icon.remove(); }, 3500);
+        }
+    }
+
+    function updateVisualProgress() {
+        const sun = getEl('sunRunner');
+        const pct = (questionsCompleted / totalQuestions);
+        const minRight = STATION_POSITIONS[0];
+        const maxRight = STATION_POSITIONS[3];
+        const currentRight = minRight + (pct * (maxRight - minRight));
+        sun.style.right = currentRight + '%';
+
+        const sec1Count = questionData[0].questions.length;
+        const sec2Count = sec1Count + questionData[1].questions.length;
+
+        getEl('node-0').classList.add('active-station');
+        getEl('node-1').classList.toggle('active-station', questionsCompleted >= sec1Count);
+        getEl('node-2').classList.toggle('active-station', questionsCompleted >= sec2Count);
+        getEl('node-3').classList.toggle('active-station', questionsCompleted >= totalQuestions);
+    }
+
+    function saveProfile() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(userProfile));
+    }
+
+    function saveGameState() {
+        currentGameState.completedCount = questionsCompleted;
+        localStorage.setItem(GAME_STATE_KEY, JSON.stringify(currentGameState));
+    }
+
+    function clearGameState() {
+        localStorage.removeItem(GAME_STATE_KEY);
+    }
+
+    function checkSavedUnfinishedState() {
+        try {
+            const saved = localStorage.getItem(GAME_STATE_KEY);
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (parsed && parsed.completedCount > 0 && parsed.completedCount < totalQuestions) {
+                    return parsed;
+                }
+            }
+        } catch (e) {}
+        return null;
+    }
+
+    function getCurrentQuestionInfo() {
+        let count = questionsCompleted;
+        if (count < questionData[0].questions.length) {
+            return { sectionIdx: 0, questionIdx: count, qObj: questionData[0].questions[count], type: "visual" };
+        }
+        count -= questionData[0].questions.length;
+        if (count < questionData[1].questions.length) {
+            return { sectionIdx: 1, questionIdx: count, qObj: questionData[1].questions[count], type: "visual" };
+        }
+        count -= questionData[1].questions.length;
+        if (count < questionData[2].questions.length) {
+            return { sectionIdx: 2, questionIdx: count, qObj: questionData[2].questions[count], type: "audio" };
+        }
+        return null;
+    }
+
+    function loadQuestion() {
+        const qInfo = getCurrentQuestionInfo();
+        if (!qInfo) {
+            endGame();
+            return;
+        }
+
+        getEl('resultDisplay').innerHTML = "";
+        getEl('resultDisplay').className = "result";
+        getEl('answerInput').value = "";
+
+        getEl('sectionTitle').innerText = questionData[qInfo.sectionIdx].title;
+        
+        const meaningEl = getEl('meaningText');
+        if (qInfo.qObj.h && qInfo.qObj.h.trim() !== "") {
+            meaningEl.classList.remove('hidden');
+            meaningEl.innerText = `(معنی: ${qInfo.qObj.h})`;
+        } else {
+            meaningEl.classList.add('hidden');
+        }
+
+        getEl('currentQIndexDisplay').innerText = toPersian(questionsCompleted + 1);
+        getEl('totalQDisplay').innerText = toPersian(totalQuestions);
+
+        if (qInfo.type === "visual") {
+            getEl('visualQuestionBox').classList.remove('hidden');
+            getEl('audioQuestionBox').classList.add('hidden');
+            
+            const qElement = getEl('currentQuestion');
+            qElement.classList.remove(...COLOR_CLASSES);
+            const colorIndex = questionsCompleted % COLOR_CLASSES.length;
+            qElement.classList.add(COLOR_CLASSES[colorIndex]);
+            qElement.innerText = qInfo.qObj.q;
+        } else {
+            getEl('visualQuestionBox').classList.add('hidden');
+            getEl('audioQuestionBox').classList.remove('hidden');
+        }
+
+        if (lastPlayedSectionIntro !== qInfo.sectionIdx) {
+            lastPlayedSectionIntro = qInfo.sectionIdx;
+            const intro = questionData[qInfo.sectionIdx].introSound;
+            if (qInfo.type === "audio") {
+                GameAudio.playList([intro], () => {
+                    playCurrentWordAudio();
+                });
+            } else {
+                GameAudio.playList([intro]);
+            }
+        } else if (qInfo.type === "audio") {
+            playCurrentWordAudio();
+        }
+
+        saveGameState();
+    }
+
+    function playCurrentWordAudio() {
+        const qInfo = getCurrentQuestionInfo();
+        if (qInfo && qInfo.qObj.audio) {
+            GameAudio.playList([qInfo.qObj.audio]);
+        }
+    }
+
+    function checkAnswer() {
+        if (isProcessingAnswer) return;
+
+        const inputElement = getEl("answerInput");
+        const checkBtn = getEl("checkBtn");
+        const enterKey = document.querySelector('.key-enter');
+        
+        const rawAnswer = inputElement.value;
+        const cleanAnswer = cleanForCompare(rawAnswer);
+
+        if (!cleanAnswer) {
+            alert('اول واژه رو بنویس قهرمان!');
+            return;
+        }
+
+        isProcessingAnswer = true;
+        checkBtn.disabled = true;
+
+        const qInfo = getCurrentQuestionInfo();
+        if (!qInfo) {
+            isProcessingAnswer = false;
+            checkBtn.disabled = false;
+            return;
+        }
+
+        const normalizedAnswer = normalizeText(rawAnswer);
+        const isCorrect = qInfo.qObj.a.some(validAns => {
+            return cleanForCompare(validAns) === cleanAnswer || normalizeText(validAns) === normalizedAnswer;
+        });
+
+        if (isCorrect) {
+            if (enterKey) enterKey.innerText = '✅';
+            GameAudio.playSFX('correct');
+            animateFeedback('correct');
+            showCelebrationEffects();
+
+            getEl('resultDisplay').innerHTML = "آفرین! کاملاً درسته ✅";
+            getEl('resultDisplay').className = "result correct";
+
+            currentGameState.score++;
+            questionsCompleted++;
+
+            updateVisualProgress();
+            saveGameState();
+
+            setTimeout(() => {
+                if (enterKey) enterKey.innerText = 'بررسی';
+                checkBtn.disabled = false;
+                isProcessingAnswer = false;
+                if (questionsCompleted >= totalQuestions) {
+                    endGame();
+                } else {
+                    loadQuestion();
+                    openKeyboard();
+                }
+            }, 1600);
+        } else {
+            if (enterKey) enterKey.innerText = '❌';
+            GameAudio.playSFX('wrong');
+            animateFeedback('wrong');
+            getEl('resultDisplay').innerHTML = "دوباره دقت کن و بنویس! ❌";
+            getEl('resultDisplay').className = "result wrong";
+            
+            setTimeout(() => {
+                if (enterKey) enterKey.innerText = 'بررسی';
+                checkBtn.disabled = false;
+                isProcessingAnswer = false;
+            }, 700);
+        }
+    }
+
+    async function endGame() {
+        closeKeyboard();
+        GameAudio.stop();
+        GameAudio.playSFX('win');
+
+        userProfile.totalGames++;
+        userProfile.totalStars++;
+        userProfile.reportShown = true;
+
+        clearGameState();
+        saveProfile();
+
+        showScreen('portal-submitting-screen');
+        await Portal.submitProgress(1, {
+            onSuccess: (data) => {
+                userProfile.totalGames = data.plays;
+                userProfile.totalStars = data.stars;
+                saveProfile();
+                updateStatsBar();
+                showReportScreen(data.goalReached, data.stars);
+            },
+            onFailure: (err) => {}
+        });
+    }
+
+    function showReportScreen(goalReached, currentStars) {
+        showScreen('screenReport');
+        const stars = currentStars !== undefined ? currentStars : userProfile.totalStars;
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('fa-IR', { year: 'numeric', month: '2-digit', day: '2-digit' });
+        const timeStr = now.toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+        getEl('rep-name').innerText = userProfile.name;
+        getEl('rep-time').innerText = toPersian(dateStr) + ' - ' + toPersian(timeStr);
+        getEl('rep-games').innerText = toPersian(userProfile.totalGames);
+        getEl('rep-stars').innerText = toPersian(stars);
+
+        const repSchool = getEl('rep-school');
+        if (repSchool) {
+            const schoolTitle = getEl('portal-school-title').textContent;
+            repSchool.innerText = schoolTitle && schoolTitle !== '---' ? schoolTitle : '-';
+        }
+
+        const repReqStarsRow = getEl('portal-req-stars-row');
+        if (repReqStarsRow) {
+            repReqStarsRow.style.display = 'block';
+            getEl('rep-req-stars').innerText = toPersian(Portal.requiredStars) + ' ⭐';
+        }
+
+        const goalBadge = getEl('portal-goal-reached-badge');
+        const submitBadge = getEl('portal-submit-badge');
+        const backInstruction = getEl('portal-back-instruction');
+        const playAgainBtn = getEl('playAgainBtn');
+
+        goalBadge.style.display = 'none';
+        submitBadge.style.display = 'none';
+        backInstruction.style.display = 'none';
+        playAgainBtn.style.display = 'block';
+
+        if (goalReached) {
+            goalBadge.style.display = 'block';
+            playAgainBtn.style.display = 'none';
+            backInstruction.innerHTML = `
+                <div style="background:#dcfce7; border:1px solid #22c55e; color:#15803d; padding:12px; border-radius:10px; margin-top:10px; font-weight:bold; font-size:0.92rem; text-align:center;">
+                    📱 آفرین! تکلیف با موفقیت تکمیل شد.<br>
+                    حالا با زدن <b>دکمه بازگشت (Back) گوشی</b> به پرتال کلاس برگرد.
+                </div>
+            `;
+            backInstruction.style.display = 'block';
+        } else {
+            const remaining = Portal.requiredStars - stars;
+            submitBadge.innerHTML = `✨ آفرین قهرمان! تو <b>${toPersian(stars)}</b> ستاره از <b>${toPersian(Portal.requiredStars)}</b> ستاره‌ی این تکلیف رو گرفتی! ⭐ فقط <b>${toPersian(remaining)}</b> ستاره‌ی دیگه مونده تا تکلیفت تموم بشه. ادامه بده تا تمومش کنی! 🏆`;
+            submitBadge.style.display = 'block';
+            playAgainBtn.innerText = "گرفتن ستاره بیشتر 🎮";
+            backInstruction.innerHTML = `
+                <div style="background:#fff3e0; border:1px solid #ffe082; color:#d97706; padding:10px; border-radius:10px; margin-top:10px; font-size:0.9rem; text-align:center;">
+                    💡 اگه می‌خوای بعداً بازی کنی، با زدن <b>دکمه بازگشت (Back) گوشی</b> به پرتال برگرد.
+                </div>
+            `;
+            backInstruction.style.display = 'block';
+        }
+    }
+
+    function showScreen(id) {
+        ['screenRegister', 'screenGame', 'screenReport', 'screen-assistant', 'portal-submitting-screen'].forEach(s => {
+            const el = getEl(s);
+            if (el) el.classList.add('hidden');
+        });
+        const target = getEl(id);
+        if (target) target.classList.remove('hidden');
+
+        const statsBar = getEl('statsBar');
+        if (statsBar) {
+            statsBar.classList.toggle('hidden', id === 'screenRegister' || id === 'screen-assistant' || id === 'portal-submitting-screen');
+        }
+        if (id !== 'screenGame') closeKeyboard();
+    }
+
+    function updateStatsBar() {
+        getEl('studentNameStat').innerText = userProfile.name;
+        getEl('gameCountStat').innerText = toPersian(userProfile.totalGames);
+        getEl('starCountStat').innerText = toPersian(userProfile.totalStars);
+    }
+
+    function restartGame() {
+        userProfile.reportShown = false;
+        questionsCompleted = 0;
+        currentGameState.score = 0;
+        lastPlayedSectionIntro = -1;
+        saveProfile();
+        clearGameState();
+        showScreen('screenGame');
+        updateStatsBar();
+        updateVisualProgress();
+        loadQuestion();
+    }
+
+    window.submitAssistantStar = async function() {
+        showScreen('portal-submitting-screen');
+        await Portal.submitProgress(null, {
+            onSuccess: () => authenticatePortalStudent(),
+            onFailure: () => {}
+        });
+    };
+
+    window.retryAuthentication = function() {
+        authenticatePortalStudent();
+    };
+
+    async function authenticatePortalStudent() {
+        await Portal.authenticate({
+            onSuccess: (data) => {
+                try {
+                    ensureLessonBannerText();
+                    getEl('portal-welcome-section').style.display = '';
+                    getEl('startGame').style.display = '';
+                    getEl('portal-error-section').style.display = 'none';
+
+                    STORAGE_KEY = `studentProfile_Emla01_${Portal.studentId}_${Portal.homeworkId}`;
+                    GAME_STATE_KEY = `gameState_Emla01_${Portal.studentId}_${Portal.homeworkId}`;
+
+                    const savedProfile = localStorage.getItem(STORAGE_KEY);
+                    if (savedProfile) {
+                        try { userProfile = JSON.parse(savedProfile); } catch (e) {}
+                    }
+
+                    userProfile.name = data.name || Portal.studentName || userProfile.name || "دانش‌آموز";
+                    userProfile.totalGames = data.plays !== undefined ? data.plays : userProfile.totalGames;
+                    userProfile.totalStars = data.stars !== undefined ? data.stars : userProfile.totalStars;
+                    saveProfile();
+                    updateStatsBar();
+
+                    getEl('portal-student-name').textContent = userProfile.name;
+                    getEl('portal-prev-plays').textContent = toPersian(userProfile.totalGames);
+                    getEl('portal-prev-stars').textContent = toPersian(userProfile.totalStars) + ' ⭐';
+                    getEl('portal-req-stars').textContent = toPersian(Portal.requiredStars) + ' ⭐';
+
+                    const unfinished = checkSavedUnfinishedState();
+                    const startBtn = getEl('startGame');
+                    if (unfinished) {
+                        startBtn.textContent = 'ادامه املا (باقیمانده) 🔄';
+                        startBtn.style.backgroundColor = '#e65100';
+                    } else {
+                        startBtn.textContent = 'شروع املا 🎨';
+                        startBtn.style.backgroundColor = '#2e7d32';
+                    }
+
+                    const hasUnsentStar = localStorage.getItem(`portal_needs_submit_${Portal.gameId}_${Portal.studentId}_${Portal.homeworkId}`) === 'true';
+
+                    if (hasUnsentStar) {
+                        getEl('ast-welcome').textContent = `سلام ${userProfile.name} عزیز! 🌟`;
+                        showScreen('screen-assistant');
+                    } else if (userProfile.reportShown) {
+                        showReportScreen(userProfile.totalStars >= Portal.requiredStars, userProfile.totalStars);
+                    } else if (unfinished) {
+                        questionsCompleted = unfinished.completedCount;
+                        currentGameState = unfinished;
+                        showScreen('screenGame');
+                        getEl('welcomeName').innerText = `سلام ${userProfile.name} قهرمان!`;
+                        updateVisualProgress();
+                        loadQuestion();
+                    } else {
+                        showScreen('screenRegister');
+                    }
+                } catch (err) {
+                    showScreen('screenRegister');
+                }
+            },
+            onFailure: () => {
+                showScreen('screenRegister');
+                getEl('portal-welcome-section').style.display = 'none';
+                getEl('startGame').style.display = 'none';
+                getEl('portal-error-section').style.display = 'block';
+            },
+            onGuestMode: () => {
+                showScreen('screenRegister');
+                getEl('portal-welcome-section').style.display = 'none';
+                getEl('startGame').style.display = 'none';
+                getEl('portal-error-section').style.display = 'block';
+            }
+        });
+    }
+
+    getEl('startGame').onclick = () => {
+        GameAudio.playSFX('click');
+        const unfinished = checkSavedUnfinishedState();
+        if (unfinished) {
+            questionsCompleted = unfinished.completedCount;
+            currentGameState = unfinished;
+        } else {
+            questionsCompleted = 0;
+            currentGameState.score = 0;
+            clearGameState();
+        }
+        userProfile.reportShown = false;
+        saveProfile();
+        showScreen('screenGame');
+        getEl('welcomeName').innerText = `سلام ${userProfile.name} قهرمان!`;
+        updateVisualProgress();
+        loadQuestion();
+    };
+
+    const vKeyboard = getEl('virtualKeyboard');
+    vKeyboard.addEventListener('contextmenu', e => e.preventDefault());
+
+    document.querySelectorAll('.key').forEach(key => {
+        key.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            GameAudio.playSFX('click');
+
+            const keyChar = key.getAttribute('data-key');
+            if (!keyChar) return;
+
+            const input = getEl('answerInput');
+            if (keyChar === 'back') {
+                input.value = input.value.slice(0, -1);
+            } else if (keyChar === 'enter') {
+                checkAnswer();
+            } else {
+                input.value += keyChar;
+            }
+        });
+    });
+
+    window.onload = () => {
+        ensureLessonBannerText();
+        const isMuted = GameAudio.isMuted;
+        const btn = getEl('btn-sound-toggle');
+        if (btn) btn.innerText = isMuted ? '🔇 صدا: خاموش' : '🔊 صدا: روشن';
+
+        authenticatePortalStudent();
+        window.addEventListener('beforeunload', () => { if (userProfile.name) saveProfile(); });
+
+        if ('serviceWorker' in navigator) {
+            const hadExistingController = !!navigator.serviceWorker.controller;
+            navigator.serviceWorker.register('sw.js');
+            let refreshing = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (!refreshing && hadExistingController) {
+                    window.location.reload();
+                    refreshing = true;
+                }
+            });
+        }
+    };
+</script>
+</body>
+</html>
